@@ -1,91 +1,110 @@
-﻿namespace VendingMachine
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace Hangman_project
 {
     internal class Program
     {
+        private static readonly StatsManager _statsManager = new StatsManager("stats.txt");
+
         static void Main(string[] args)
         {
-            Console.WriteLine("|=== Vending Machine ===|");
+            Console.WriteLine("Welcome to Hangman!");
 
-            VendingMachine vm = new VendingMachine();
-            bool running = true;
-
-            while (running)
+            while (true)
             {
+                Console.WriteLine("\nSelect an option:");
+                Console.WriteLine("1. Play Hangman");
+                Console.WriteLine("2. View High Scores");
+                Console.WriteLine("3. Exit");
+                Console.Write("Enter your choice: ");
+
+                string? choice = Console.ReadLine();
+
+                if (string.IsNullOrEmpty(choice))
+                {
+                    Console.WriteLine("Invalid choice. Please try again.");
+                    continue;
+                }
+
+                switch (choice)
+                {
+                    case "1":
+                        PlayGame();
+                        break;
+                    case "2":
+                        DisplayHighScores();
+                        break;
+                    case "3":
+                        Console.WriteLine("Thanks for playing!");
+                        return;
+                    default:
+                        Console.WriteLine("Invalid choice. Please try again.");
+                        break;
+                }
+            }
+        }
+
+        private static void PlayGame()
+        {
+            string? playerName;
+            do
+            {
+                Console.Write("Please enter your name: ");
+                playerName = Console.ReadLine();
+            } while (string.IsNullOrEmpty(playerName));
+
+            string selectedWord = WordManager.GetRandomWordFromFile("words.txt");
+            var game = new HangmanGame(selectedWord);
+
+            while (game.State == GameState.InProgress)
+            {
+                game.DisplayGameState();
+                char letter = game.GetLetterInput();
+
                 try
                 {
-                    Console.WriteLine("\n--- Menu ---");
-                    Console.WriteLine("1. Deposite");
-                    Console.WriteLine("2. Purchase product");
-                    Console.WriteLine("3. Balance");
-                    Console.WriteLine("4. Product list");
-                    Console.WriteLine("5. Exit");
-                    Console.Write("\nSelect an operation: ");
-
-                    string choice = Console.ReadLine();
-
-                    switch (choice)
+                    bool validGuess = game.MakeGuess(letter);
+                    if (!validGuess)
                     {
-                        case "1":
-                            Console.Write("Deposit amount (20, 50, 100, 500): ");
-                            if (int.TryParse(Console.ReadLine(), out int amount))
-                            {
-                                vm.Deposit(amount);
-                            }
-                            else
-                            {
-                                Console.WriteLine("Incorrect format!");
-                            }
-                            break;
-
-                        case "2":
-                            vm.ShowProducts();
-                            Console.Write("Enter product code: ");
-                            string code = Console.ReadLine();
-                            vm.Purchase(code);
-                            break;
-
-                        case "3":
-                            vm.ShowBalance();
-                            break;
-
-                        case "4":
-                            vm.ShowProducts();
-                            break;
-
-                        case "5":
-                            if (vm.GetBalance() > 0)
-                            {
-                                Console.WriteLine($"\nBalance {vm.GetBalance():F2} GEL");
-                            }
-                            Console.WriteLine("Thanks you <3");
-                            running = false;
-                            break;
-
-                        default:
-                            Console.WriteLine("Inncorect format!");
-                            break;
+                        game.DisplayAlreadyGuessed();
                     }
                 }
-                catch (InvalidCodeException ex)
+                catch (ArgumentException ex)
                 {
-                    Console.WriteLine($"Error: {ex.Message}");
+                    string message = game.DisplayInvalidInput();
+                    Logger.Log(ex, message);
                 }
-                catch (OutOfStockException ex)
-                {
-                    Console.WriteLine($"Error: {ex.Message}");
-                }
-                catch (InsufficientBalanceException ex)
-                {
-                    Console.WriteLine($"Error: {ex.Message}");
-                }
-                catch (InvalidDenominationException ex)
-                {
-                    Console.WriteLine($"Error: {ex.Message}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Unexpected error: {ex.Message}");
-                }
+            }
+
+            bool hasWon = game.State == GameState.Won;
+            if (hasWon)
+            {
+                game.DisplayWin();
+            }
+            else
+            {
+                game.DisplayLoss();
+            }
+
+            _statsManager.UpdateStats(playerName, hasWon);
+        }
+
+        private static void DisplayHighScores()
+        {
+            Console.WriteLine("\n--- High Scores ---");
+            var highScores = _statsManager.GetHighScores();
+
+            if (highScores.Count == 0)
+            {
+                Console.WriteLine("No scores yet!");
+                return;
+            }
+
+            foreach (var score in highScores)
+            {
+                Console.WriteLine($"- {score.PlayerName}: {score.Wins} wins, {score.Losses} losses");
             }
         }
     }
